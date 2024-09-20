@@ -17,7 +17,8 @@ import java.util.stream.Collectors;
 public class RestExceptionHandler {
 
     @ExceptionHandler({
-            OrderNotFoundException.class
+            OrderNotFoundException.class,
+            ProductCatalogNotFoundException.class,
     })
     @ResponseStatus(HttpStatus.NOT_FOUND)
     @ResponseBody
@@ -28,12 +29,15 @@ public class RestExceptionHandler {
         );
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ExceptionHandler({
+            DataIntegrityViolationException.class,
+            ProductQuantityException.class
+    })
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     @ResponseBody
-    public ErrorResponse handleDataIntegrityViolationException(DataIntegrityViolationException exception) {
+    public ErrorResponse handleDataIntegrityException(Exception exception) {
         return new ErrorResponse(
-                "Data already present",
+                exception.getMessage(),
                 HttpStatus.BAD_REQUEST
         );
     }
