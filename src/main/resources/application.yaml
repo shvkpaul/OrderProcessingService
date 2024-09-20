@@ -1,3 +1,6 @@
+server:
+  port: 8081
+
 spring:
   application:
     name: Order-Processing-Service
@@ -10,15 +13,14 @@ spring:
     username: order-team
     password: order-team-pass
     driver-class-name: com.mysql.cj.jdbc.Driver
+  config:
+    import: configserver:http://localhost:9296
 
-server:
-  port: 8081
-
-eureka:
-  instance:
-    prefer-ip-address: true
-  client:
-    fetch-registry: true
-    register-with-eureka: true
-    service-url:
-      defaultZone: http://localhost:8761/eureka
+#eureka:
+#  instance:
+#    prefer-ip-address: true
+#  client:
+#    fetch-registry: true
+#    register-with-eureka: true
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka
