@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: Order-Processing-Service
+    name: ORDER-PROCESSING-SERVICE
   jpa:
     hibernate:
       ddl-auto: update
