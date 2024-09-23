@@ -2,9 +2,11 @@ package org.shvk.orderprocessingservice.service;
 
 import lombok.extern.log4j.Log4j2;
 import org.shvk.orderprocessingservice.entity.Order;
+import org.shvk.orderprocessingservice.exception.OrderNotFoundException;
 import org.shvk.orderprocessingservice.exception.ProductCatalogNotFoundException;
 import org.shvk.orderprocessingservice.exception.ProductQuantityException;
 import org.shvk.orderprocessingservice.model.OrderRequest;
+import org.shvk.orderprocessingservice.model.OrderResponse;
 import org.shvk.orderprocessingservice.model.PaymentRequest;
 import org.shvk.orderprocessingservice.repository.OrderRepository;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,24 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
     ) {
         this.orderRepository = orderRepository;
         this.webClient = webClient;
+    }
+
+    @Override
+    public OrderResponse getOrderDetails(long orderId) {
+        log.info("Get order details for the orderId: {}", orderId);
+
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("OrderId not found: " + orderId));
+
+        OrderResponse orderResponse
+                = new OrderResponse(
+                orderId,
+                order.getOrderDateTime(),
+                order.getOrderStatus(),
+                order.getAmount()
+        );
+
+        return orderResponse;
     }
 
     @Override
