@@ -8,6 +8,7 @@ import org.shvk.orderprocessingservice.exception.ProductQuantityException;
 import org.shvk.orderprocessingservice.model.OrderRequest;
 import org.shvk.orderprocessingservice.model.OrderResponse;
 import org.shvk.orderprocessingservice.model.PaymentRequest;
+import org.shvk.orderprocessingservice.model.ProductDetails;
 import org.shvk.orderprocessingservice.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -38,12 +39,22 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("OrderId not found: " + orderId));
 
+        log.info("Get Product details for productId: {}", order.getProductId());
+
+        ProductDetails productDetails = getProductDetails(order.getProductId());
+
         OrderResponse orderResponse
                 = new OrderResponse(
                 orderId,
                 order.getOrderDateTime(),
                 order.getOrderStatus(),
-                order.getAmount()
+                order.getAmount(),
+                new ProductDetails(
+                        productDetails.productId(),
+                        productDetails.productName(),
+                        productDetails.price(),
+                        productDetails.quantity()
+                )
         );
 
         return orderResponse;
@@ -117,6 +128,22 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
             if (e.getStatusCode().value() == 400) {
                 throw new ProductQuantityException("Product does not have sufficient quantity");
             } else if (e.getStatusCode().value() == 404) {
+                throw new ProductCatalogNotFoundException("Product not found");
+            }
+            throw e;
+        }
+    }
+
+    private ProductDetails getProductDetails(long productId) {
+        try {
+            return webClient.get()
+                    .uri("http://localhost:8080/product/{id}", productId)
+                    .header("accept", "*/*")
+                    .retrieve()
+                    .bodyToMono(ProductDetails.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
                 throw new ProductCatalogNotFoundException("Product not found");
             }
             throw e;
