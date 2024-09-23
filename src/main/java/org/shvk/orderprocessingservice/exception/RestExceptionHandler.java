@@ -19,6 +19,7 @@ public class RestExceptionHandler {
     @ExceptionHandler({
             OrderNotFoundException.class,
             ProductCatalogNotFoundException.class,
+            PaymentDetailsNotFoundException.class
     })
     @ResponseStatus(HttpStatus.NOT_FOUND)
     @ResponseBody

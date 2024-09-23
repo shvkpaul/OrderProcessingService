@@ -3,12 +3,10 @@ package org.shvk.orderprocessingservice.service;
 import lombok.extern.log4j.Log4j2;
 import org.shvk.orderprocessingservice.entity.Order;
 import org.shvk.orderprocessingservice.exception.OrderNotFoundException;
+import org.shvk.orderprocessingservice.exception.PaymentDetailsNotFoundException;
 import org.shvk.orderprocessingservice.exception.ProductCatalogNotFoundException;
 import org.shvk.orderprocessingservice.exception.ProductQuantityException;
-import org.shvk.orderprocessingservice.model.OrderRequest;
-import org.shvk.orderprocessingservice.model.OrderResponse;
-import org.shvk.orderprocessingservice.model.PaymentRequest;
-import org.shvk.orderprocessingservice.model.ProductDetails;
+import org.shvk.orderprocessingservice.model.*;
 import org.shvk.orderprocessingservice.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -43,6 +41,10 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
 
         ProductDetails productDetails = getProductDetails(order.getProductId());
 
+        log.info("Getting payment information for the orderId: {}", orderId);
+
+        PaymentDetails paymentDetails = getPaymentDetailsByOrderId(orderId);
+
         OrderResponse orderResponse
                 = new OrderResponse(
                 orderId,
@@ -54,6 +56,14 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
                         productDetails.productName(),
                         productDetails.price(),
                         productDetails.quantity()
+                ),
+                new PaymentDetails(
+                        paymentDetails.paymentId(),
+                        paymentDetails.status(),
+                        paymentDetails.paymentMode(),
+                        paymentDetails.amount(),
+                        paymentDetails.paymentDate(),
+                        paymentDetails.orderId()
                 )
         );
 
@@ -89,7 +99,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
                 UUID.randomUUID().toString(),
                 orderRequest.getPaymentMode());
 
-        String orderStatus = null;
+        String orderStatus;
 
         try {
             webClient.post()
@@ -145,6 +155,22 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         } catch (WebClientResponseException e) {
             if (e.getStatusCode().value() == 404) {
                 throw new ProductCatalogNotFoundException("Product not found");
+            }
+            throw e;
+        }
+    }
+
+    private PaymentDetails getPaymentDetailsByOrderId(long orderId) {
+        try {
+            return webClient.get()
+                    .uri("http://localhost:8082/payment/order/{orderId}", orderId)
+                    .header("accept", "*/*")
+                    .retrieve()
+                    .bodyToMono(PaymentDetails.class)
+                    .block();
+        } catch (WebClientResponseException e) {
+            if (e.getStatusCode().value() == 404) {
+                throw new PaymentDetailsNotFoundException("Payment details not found for orderId: " + orderId);
             }
             throw e;
         }

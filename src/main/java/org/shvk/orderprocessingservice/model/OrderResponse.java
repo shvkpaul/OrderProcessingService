@@ -7,6 +7,7 @@ public record OrderResponse(
         Instant orderDate,
         String orderStatus,
         long amount,
-        ProductDetails productDetails
+        ProductDetails productDetails,
+        PaymentDetails paymentDetails
 ) {
 }
