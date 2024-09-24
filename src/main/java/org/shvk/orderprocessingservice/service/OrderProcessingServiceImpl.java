@@ -8,6 +8,7 @@ import org.shvk.orderprocessingservice.exception.ProductCatalogNotFoundException
 import org.shvk.orderprocessingservice.exception.ProductQuantityException;
 import org.shvk.orderprocessingservice.model.*;
 import org.shvk.orderprocessingservice.repository.OrderRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
@@ -18,6 +19,9 @@ import java.util.UUID;
 @Service
 @Log4j2
 public class OrderProcessingServiceImpl implements OrderProcessingService {
+
+    @Value("${api-gateway.url}")
+    private String apiGatewayUrl;
 
     private OrderRepository orderRepository;
     private WebClient webClient;
@@ -103,7 +107,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
 
         try {
             webClient.post()
-                    .uri("http://localhost:8082/payment")
+                    .uri(apiGatewayUrl+"/payment")
                     .header("accept", "*/*")
                     .header("Content-Type", "application/json")
                     .bodyValue(paymentRequest)
@@ -130,7 +134,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
     private String reduceProductQuantity(long productId, long quantity) {
         try {
             return webClient.put()
-                    .uri("http://localhost:8080/product/reduceQuantity/{id}?quantity={quantity}", productId, quantity)
+                    .uri(apiGatewayUrl+"/product/reduceQuantity/{id}?quantity={quantity}", productId, quantity)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
@@ -147,7 +151,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
     private ProductDetails getProductDetails(long productId) {
         try {
             return webClient.get()
-                    .uri("http://localhost:8080/product/{id}", productId)
+                    .uri(apiGatewayUrl+"/product/{id}", productId)
                     .header("accept", "*/*")
                     .retrieve()
                     .bodyToMono(ProductDetails.class)
@@ -163,7 +167,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
     private PaymentDetails getPaymentDetailsByOrderId(long orderId) {
         try {
             return webClient.get()
-                    .uri("http://localhost:8082/payment/order/{orderId}", orderId)
+                    .uri(apiGatewayUrl+"/payment/order/{orderId}", orderId)
                     .header("accept", "*/*")
                     .retrieve()
                     .bodyToMono(PaymentDetails.class)
