@@ -1,5 +1,6 @@
 package org.shvk.orderprocessingservice.service;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.log4j.Log4j2;
 import org.shvk.orderprocessingservice.entity.Order;
 import org.shvk.orderprocessingservice.exception.OrderNotFoundException;
@@ -107,7 +108,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
 
         try {
             webClient.post()
-                    .uri(apiGatewayUrl+"/payment")
+                    .uri(apiGatewayUrl + "/payment")
                     .header("accept", "*/*")
                     .header("Content-Type", "application/json")
                     .bodyValue(paymentRequest)
@@ -131,10 +132,11 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         return order.getOrderId();
     }
 
+    @CircuitBreaker(name = "external", fallbackMethod = "fallbackMethod")
     private String reduceProductQuantity(long productId, long quantity) {
         try {
             return webClient.put()
-                    .uri(apiGatewayUrl+"/product/reduceQuantity/{id}?quantity={quantity}", productId, quantity)
+                    .uri(apiGatewayUrl + "/product/reduceQuantity/{id}?quantity={quantity}", productId, quantity)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
@@ -148,10 +150,11 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         }
     }
 
+    @CircuitBreaker(name = "external", fallbackMethod = "fallbackMethod")
     private ProductDetails getProductDetails(long productId) {
         try {
             return webClient.get()
-                    .uri(apiGatewayUrl+"/product/{id}", productId)
+                    .uri(apiGatewayUrl + "/product/{id}", productId)
                     .header("accept", "*/*")
                     .retrieve()
                     .bodyToMono(ProductDetails.class)
@@ -164,10 +167,11 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         }
     }
 
+    @CircuitBreaker(name = "external", fallbackMethod = "fallbackMethod")
     private PaymentDetails getPaymentDetailsByOrderId(long orderId) {
         try {
             return webClient.get()
-                    .uri(apiGatewayUrl+"/payment/order/{orderId}", orderId)
+                    .uri(apiGatewayUrl + "/payment/order/{orderId}", orderId)
                     .header("accept", "*/*")
                     .retrieve()
                     .bodyToMono(PaymentDetails.class)
@@ -178,5 +182,9 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
             }
             throw e;
         }
+    }
+
+    public String fallbackMethod(Throwable throwable) {
+        return "Service is down for some time";
     }
 }
