@@ -25,8 +25,8 @@ spring:
 #    service-url:
 #      defaultZone: http://localhost:8761/eureka
 
-api-gateway:
-  url: http://localhost:9090
+#api-gateway:
+#  url: http://localhost:9090
 
 management:
   tracing:
