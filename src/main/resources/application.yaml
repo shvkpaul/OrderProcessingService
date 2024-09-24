@@ -32,11 +32,15 @@ management:
   tracing:
     sampling:
       probability: 1.0
+  endpoints:
+    web:
+      exposure:
+        include: resilience4j.circuitbreakers
 
 resilience4j:
   circuitbreaker:
     instances:
-      external:
+      paymentService:
         event-consumer-buffer-size: 10
         failure-rate-threshold: 50
         minimum-number-of-calls: 5

@@ -131,7 +131,6 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         return order.getOrderId();
     }
 
-    @CircuitBreaker(name = "external", fallbackMethod = "fallbackMethod")
     private String reduceProductQuantity(long productId, long quantity) {
         try {
             return webClient.put()
@@ -149,7 +148,6 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         }
     }
 
-    @CircuitBreaker(name = "external", fallbackMethod = "fallbackMethod")
     private ProductDetails getProductDetails(long productId) {
         try {
             return webClient.get()
@@ -166,7 +164,7 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         }
     }
 
-    @CircuitBreaker(name = "external", fallbackMethod = "fallbackMethod")
+    @CircuitBreaker(name = "paymentService", fallbackMethod = "fallbackPaymentDetails")
     private PaymentDetails getPaymentDetailsByOrderId(long orderId) {
         try {
             return webClient.get()
@@ -183,7 +181,17 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         }
     }
 
-    public String fallbackMethod(Throwable throwable) {
-        return "Service is down for some time";
+    private PaymentDetails fallbackPaymentDetails(long orderId, Throwable throwable) {
+        log.error("Payment service failed, fallback executed: {}", throwable.getMessage());
+
+        // Provide a default or fallback response
+        return new PaymentDetails(
+                0L,
+                "Unavailable",
+                null,
+                0L,
+                Instant.now(),
+                orderId
+        );
     }
 }
