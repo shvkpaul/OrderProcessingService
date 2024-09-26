@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/order")
@@ -22,9 +23,8 @@ public class OrderProcessingController {
     }
 
     @GetMapping("/{orderId}")
-    public ResponseEntity<OrderResponse> getOrderDetails(
-            @PathVariable long orderId) {
-        OrderResponse orderResponse = orderProcessingService.getOrderDetails(orderId);
-        return new ResponseEntity<>(orderResponse, HttpStatus.OK);
+    public Mono<ResponseEntity<OrderResponse>> getOrderDetails(@PathVariable long orderId) {
+        return orderProcessingService.getOrderDetails(orderId)
+                .map(orderResponse -> ResponseEntity.status(HttpStatus.OK).body(orderResponse));
     }
 }

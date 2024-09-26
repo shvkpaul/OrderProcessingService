@@ -12,6 +12,7 @@ import org.shvk.orderprocessingservice.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -35,43 +36,33 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
     }
 
     @Override
-    public OrderResponse getOrderDetails(long orderId) {
+    public Mono<OrderResponse> getOrderDetails(long orderId) {
         log.info("Get order details for the orderId: {}", orderId);
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new OrderNotFoundException("OrderId not found: " + orderId));
+        // Fetch order details from the database asynchronously
+        return Mono.fromSupplier(() -> orderRepository.findById(orderId)
+                        .orElseThrow(() -> new OrderNotFoundException("OrderId not found: " + orderId)))
+                .flatMap(order -> {
+                    // Fetch product details and payment details concurrently
+                    Mono<ProductDetails> productDetailsMono = getProductDetailsByProductId(order.getProductId());
+                    Mono<PaymentDetails> paymentDetailsMono = getPaymentDetailsByOrderId(orderId);
 
-        log.info("Get Product details for productId: {}", order.getProductId());
+                    return Mono.zip(productDetailsMono, paymentDetailsMono)
+                            .map(tuple -> {
+                                ProductDetails productDetails = tuple.getT1();
+                                PaymentDetails paymentDetails = tuple.getT2();
 
-        ProductDetails productDetails = getProductDetails(order.getProductId());
-
-        log.info("Getting payment information for the orderId: {}", orderId);
-
-        PaymentDetails paymentDetails = getPaymentDetailsByOrderId(orderId);
-
-        OrderResponse orderResponse
-                = new OrderResponse(
-                orderId,
-                order.getOrderDateTime(),
-                order.getOrderStatus(),
-                order.getAmount(),
-                new ProductDetails(
-                        productDetails.productId(),
-                        productDetails.productName(),
-                        productDetails.price(),
-                        productDetails.quantity()
-                ),
-                new PaymentDetails(
-                        paymentDetails.paymentId(),
-                        paymentDetails.status(),
-                        paymentDetails.paymentMode(),
-                        paymentDetails.amount(),
-                        paymentDetails.paymentDate(),
-                        paymentDetails.orderId()
-                )
-        );
-
-        return orderResponse;
+                                // Construct and return the order response
+                                return new OrderResponse(
+                                        order.getOrderId(),
+                                        order.getOrderDateTime(),
+                                        order.getOrderStatus(),
+                                        order.getAmount(),
+                                        productDetails,
+                                        paymentDetails
+                                );
+                            });
+                });
     }
 
     @Override
@@ -148,42 +139,45 @@ public class OrderProcessingServiceImpl implements OrderProcessingService {
         }
     }
 
-    private ProductDetails getProductDetails(long productId) {
-        try {
-            return webClient.get()
-                    .uri("http://PRODUCT-CATALOG-SERVICE/product/{id}", productId)
-                    .header("accept", "*/*")
-                    .retrieve()
-                    .bodyToMono(ProductDetails.class)
-                    .block();
-        } catch (WebClientResponseException e) {
-            if (e.getStatusCode().value() == 404) {
-                throw new ProductCatalogNotFoundException("Product not found");
-            }
-            throw e;
-        }
+    @CircuitBreaker(name = "paymentService", fallbackMethod = "fallbackPaymentDetails")
+    private Mono<PaymentDetails> getPaymentDetailsByOrderId(long orderId) {
+        return webClient.get()
+                .uri("http://PAYMENT-SERVICE/payment/order/{orderId}", orderId)
+                .header("accept", "*/*")
+                .retrieve()
+                .bodyToMono(PaymentDetails.class)
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    if (e.getStatusCode().value() == 404) {
+                        return Mono.error(new PaymentDetailsNotFoundException("Payment details not found for orderId: " + orderId));
+                    }
+                    return Mono.error(e);
+                })
+                .onErrorResume(throwable -> {
+                    log.error("Payment service failed, fallback executed: {}", throwable.getMessage());
+                    return Mono.just(new PaymentDetails(0L, "Unavailable", null, 0L, Instant.now(), orderId));
+                });
     }
 
-    @CircuitBreaker(name = "paymentService", fallbackMethod = "fallbackPaymentDetails")
-    private PaymentDetails getPaymentDetailsByOrderId(long orderId) {
-        try {
-            return webClient.get()
-                    .uri("http://PAYMENT-SERVICE/payment/order/{orderId}", orderId)
-                    .header("accept", "*/*")
-                    .retrieve()
-                    .bodyToMono(PaymentDetails.class)
-                    .block();
-        } catch (WebClientResponseException e) {
-            if (e.getStatusCode().value() == 404) {
-                throw new PaymentDetailsNotFoundException("Payment details not found for orderId: " + orderId);
-            }
-            throw e;
-        }
+    private Mono<ProductDetails> getProductDetailsByProductId(long productId) {
+        return webClient.get()
+                .uri("http://PRODUCT-CATALOG-SERVICE/product/{id}", productId)
+                .header("accept", "*/*")
+                .retrieve()
+                .bodyToMono(ProductDetails.class)
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    if (e.getStatusCode().value() == 404) {
+                        return Mono.error(new ProductCatalogNotFoundException("Product not found"));
+                    }
+                    return Mono.error(e);
+                })
+                .onErrorResume(throwable -> {
+                    log.error("Product service failed, fallback executed: {}", throwable.getMessage());
+                    // Return default product details in case of failure
+                    return Mono.just(new ProductDetails(productId, "Unavailable Product", 0L, 0));
+                });
     }
 
     private PaymentDetails fallbackPaymentDetails(long orderId, Throwable throwable) {
-        log.error("Payment service failed, fallback executed: {}", throwable.getMessage());
-
         // Provide a default or fallback response
         return new PaymentDetails(
                 0L,
