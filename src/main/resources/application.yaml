@@ -1,1 +1,51 @@
-spring.application.name=OrderProcessingService
+server:
+  port: 8081
+
+spring:
+  application:
+    name: ORDER-PROCESSING-SERVICE
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  datasource:
+    url: jdbc:mysql://localhost:3306/orderdb
+    username: order-team
+    password: order-team-pass
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  config:
+    import: configserver:http://localhost:9296
+
+#eureka:
+#  instance:
+#    prefer-ip-address: true
+#  client:
+#    fetch-registry: true
+#    register-with-eureka: true
+#    service-url:
+#      defaultZone: http://localhost:8761/eureka
+
+#api-gateway:
+#  url: http://localhost:9090
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+  endpoints:
+    web:
+      exposure:
+        include: resilience4j.circuitbreakers
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      paymentService:
+        event-consumer-buffer-size: 10
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        automatic-transition-from-open-to-half-open-enabled: true
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+        sliding-window-type: COUNT_BASED
